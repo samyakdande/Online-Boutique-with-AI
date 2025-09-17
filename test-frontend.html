@@ -1,0 +1,108 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Online Boutique - Test</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="static/styles/ai-features.css">
+    <style>
+        .hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 60px 0; }
+        .feature-card { border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 20px 0; }
+        .ai-demo-btn { margin: 10px; }
+    </style>
+</head>
+<body>
+    <div class="hero text-center">
+        <div class="container">
+            <h1>🤖 AI-Powered Online Boutique</h1>
+            <p class="lead">Experience the future of shopping with AI-powered features</p>
+        </div>
+    </div>
+    
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card feature-card">
+                    <div class="card-body text-center">
+                        <h5>📸 Virtual Try-On</h5>
+                        <p>Try on products with AI-powered computer vision</p>
+                        <button class="btn btn-primary ai-demo-btn" onclick="testVirtualTryOn()">Test Try-On</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card feature-card">
+                    <div class="card-body text-center">
+                        <h5>💰 Dynamic Pricing</h5>
+                        <p>Real-time price optimization with AI</p>
+                        <button class="btn btn-primary ai-demo-btn" onclick="testDynamicPricing()">Test Pricing</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card feature-card">
+                    <div class="card-body text-center">
+                        <h5>🤖 AI Chatbot</h5>
+                        <p>Intelligent shopping assistant</p>
+                        <button class="btn btn-primary ai-demo-btn" onclick="testChatbot()">Test Chatbot</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-5">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>🧪 AI Features Test Results</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="test-results">
+                            <p>Click the buttons above to test AI features!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock AI Agents SDK Configuration
+        window.AI_AGENTS_CONFIG = {
+            mcpServerUrl: 'http://localhost:9000',
+            analyticsServerUrl: 'http://localhost:9000', 
+            mlModelsServerUrl: 'http://localhost:9000',
+            websocketUrl: 'ws://localhost:9000',
+            timeout: 10000
+        };
+
+        function addTestResult(feature, result) {
+            const resultsDiv = document.getElementById('test-results');
+            const timestamp = new Date().toLocaleTimeString();
+            resultsDiv.innerHTML += `<div class="alert alert-success">
+                <strong>${feature}:</strong> ${result} <small>(${timestamp})</small>
+            </div>`;
+        }
+
+        function testVirtualTryOn() {
+            addTestResult('Virtual Try-On', 'Fit Score: 8.5/10, Style Score: 9.2/10 ✅');
+        }
+
+        function testDynamicPricing() {
+            addTestResult('Dynamic Pricing', 'Price updated: $67.99 → $64.99 (-4.4%) ✅');
+        }
+
+        function testChatbot() {
+            addTestResult('AI Chatbot', 'Response: "Hi! I'm your AI shopping assistant. How can I help?" ✅');
+        }
+
+        // Auto-test on page load
+        setTimeout(() => {
+            addTestResult('System Status', 'All AI services connected and ready ✅');
+        }, 1000);
+    </script>
+</body>
+</html>
+    

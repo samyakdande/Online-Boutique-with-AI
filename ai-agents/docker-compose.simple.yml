@@ -1,0 +1,225 @@
+# Simple Docker Compose for AI-Powered Boutique Agents (No local Python needed)
+
+services:
+  # Boutique API MCP Server (lightweight)
+  boutique-api-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    ports:
+      - "8080:8080"
+    environment:
+      - MCP_SERVER_TYPE=boutique-api
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./ai_agents:/app/ai_agents  # Hot reload for development
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Analytics MCP Server
+  analytics-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    ports:
+      - "8081:8081"
+    environment:
+      - MCP_SERVER_TYPE=analytics
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./ai_agents:/app/ai_agents  # Hot reload for development
+    command: python -m ai_agents.mcp_servers.analytics
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ML Models MCP Server
+  ml-models-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    ports:
+      - "8082:8082"
+    environment:
+      - MCP_SERVER_TYPE=ml-models
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./ai_agents:/app/ai_agents  # Hot reload for development
+    command: python -m ai_agents.mcp_servers.ml_models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Review Tracker Agent Demo
+  review-tracker-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./ai_agents:/app/ai_agents
+      - ./scripts:/app/scripts
+      - ./tests:/app/tests
+    command: python scripts/demo_review_tracker.py
+    depends_on:
+      - boutique-api-mcp
+      - analytics-mcp
+      - ml-models-mcp
+    profiles:
+      - demo
+
+  # Advanced Recommendation Agent Demo
+  recommendation-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./ai_agents:/app/ai_agents
+      - ./scripts:/app/scripts
+      - ./tests:/app/tests
+    command: python scripts/demo_advanced_recommendation.py
+    depends_on:
+      - boutique-api-mcp
+      - analytics-mcp
+      - ml-models-mcp
+    profiles:
+      - demo
+
+  # AI Chatbot Agent Demo
+  chatbot-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./ai_agents:/app/ai_agents
+      - ./scripts:/app/scripts
+      - ./tests:/app/tests
+    command: python scripts/demo_ai_chatbot.py
+    depends_on:
+      - boutique-api-mcp
+      - analytics-mcp
+      - ml-models-mcp
+    profiles:
+      - demo
+
+  # Dynamic Pricing Agent Demo
+  pricing-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./ai_agents:/app/ai_agents
+      - ./scripts:/app/scripts
+      - ./tests:/app/tests
+    command: python scripts/demo_dynamic_pricing.py
+    depends_on:
+      - boutique-api-mcp
+      - analytics-mcp
+      - ml-models-mcp
+    profiles:
+      - demo
+
+  # Marketing Email Agent Demo
+  email-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./ai_agents:/app/ai_agents
+      - ./scripts:/app/scripts
+      - ./tests:/app/tests
+    command: python scripts/demo_marketing_email.py
+    depends_on:
+      - boutique-api-mcp
+      - analytics-mcp
+      - ml-models-mcp
+    profiles:
+      - demo
+
+  # Virtual Try-On Agent Demo
+  virtual-tryon-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./ai_agents:/app/ai_agents
+      - ./scripts:/app/scripts
+      - ./tests:/app/tests
+    command: python scripts/demo_virtual_tryon.py
+    depends_on:
+      - boutique-api-mcp
+      - analytics-mcp
+      - ml-models-mcp
+    profiles:
+      - demo
+
+  # Test runner (runs our MCP tests)
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./ai_agents:/app/ai_agents
+      - ./scripts:/app/scripts
+    command: python scripts/test-mcp-simple.py
+    depends_on:
+      - boutique-api-mcp
+    profiles:
+      - testing
+
+networks:
+  default:
+    name: ai-agents-simple

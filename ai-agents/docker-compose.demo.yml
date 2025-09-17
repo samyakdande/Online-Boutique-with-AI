@@ -1,0 +1,66 @@
+# Docker Compose for Review Tracker Agent Demo
+
+services:
+  # Review Tracker Agent Demo
+  review-tracker-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./ai_agents:/app/ai_agents  # Hot reload for development
+      - ./scripts:/app/scripts
+      - ./tests:/app/tests
+    command: python scripts/demo_review_tracker.py
+    stdin_open: true
+    tty: true
+    networks:
+      - ai-agents-demo
+
+  # Interactive Review Tracker Demo (for user input)
+  review-tracker-interactive:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./ai_agents:/app/ai_agents
+      - ./scripts:/app/scripts
+    command: python scripts/demo_review_tracker.py --interactive
+    stdin_open: true
+    tty: true
+    networks:
+      - ai-agents-demo
+    profiles:
+      - interactive
+
+  # Test Runner for Review Tracker
+  review-tracker-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./ai_agents:/app/ai_agents
+      - ./tests:/app/tests
+    command: python -m pytest tests/test_review_tracker.py -v
+    networks:
+      - ai-agents-demo
+    profiles:
+      - testing
+
+networks:
+  ai-agents-demo:
+    name: ai-agents-demo

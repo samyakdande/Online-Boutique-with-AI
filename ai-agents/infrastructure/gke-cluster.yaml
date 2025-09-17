@@ -1,0 +1,158 @@
+apiVersion: container.cnrm.cloud.google.com/v1beta1
+kind: ContainerCluster
+metadata:
+  name: ai-boutique-cluster
+  namespace: default
+  annotations:
+    cnrm.cloud.google.com/project-id: ${GOOGLE_CLOUD_PROJECT}
+spec:
+  location: ${GOOGLE_CLOUD_REGION}
+  
+  # Enable kubectl-ai integration
+  addonsConfig:
+    gcePersistentDiskCsiDriverConfig:
+      enabled: true
+    networkPolicyConfig:
+      disabled: false
+    httpLoadBalancing:
+      disabled: false
+    horizontalPodAutoscaling:
+      disabled: false
+    kubernetesDashboard:
+      disabled: true
+    dnsCacheConfig:
+      enabled: true
+  
+  # AI workload optimized node pool
+  nodePools:
+  - name: ai-agents-pool
+    initialNodeCount: 3
+    nodeConfig:
+      machineType: e2-standard-4
+      diskSizeGb: 100
+      diskType: pd-ssd
+      imageType: COS_CONTAINERD
+      
+      # Enable AI/ML optimizations
+      metadata:
+        disable-legacy-endpoints: "true"
+        kubectl-ai-enabled: "true"
+      
+      oauthScopes:
+      - https://www.googleapis.com/auth/cloud-platform
+      - https://www.googleapis.com/auth/logging.write
+      - https://www.googleapis.com/auth/monitoring
+      - https://www.googleapis.com/auth/devstorage.read_only
+      
+      labels:
+        workload-type: ai-agents
+        kubectl-ai: enabled
+      
+      taints:
+      - key: ai-workload
+        value: "true"
+        effect: NO_SCHEDULE
+    
+    autoscaling:
+      enabled: true
+      minNodeCount: 1
+      maxNodeCount: 10
+    
+    management:
+      autoRepair: true
+      autoUpgrade: true
+  
+  # GPU node pool for ML inference
+  - name: gpu-pool
+    initialNodeCount: 0
+    nodeConfig:
+      machineType: n1-standard-4
+      diskSizeGb: 100
+      diskType: pd-ssd
+      imageType: COS_CONTAINERD
+      
+      guestAccelerator:
+      - type: nvidia-tesla-t4
+        count: 1
+      
+      metadata:
+        disable-legacy-endpoints: "true"
+        kubectl-ai-enabled: "true"
+      
+      oauthScopes:
+      - https://www.googleapis.com/auth/cloud-platform
+      
+      labels:
+        workload-type: ml-inference
+        accelerator: nvidia-tesla-t4
+      
+      taints:
+      - key: nvidia.com/gpu
+        value: "true"
+        effect: NO_SCHEDULE
+    
+    autoscaling:
+      enabled: true
+      minNodeCount: 0
+      maxNodeCount: 5
+    
+    management:
+      autoRepair: true
+      autoUpgrade: true
+  
+  # Network configuration
+  network: default
+  subnetwork: default
+  
+  # Security configuration
+  masterAuth:
+    clientCertificateConfig:
+      issueClientCertificate: false
+  
+  networkPolicy:
+    enabled: true
+    provider: CALICO
+  
+  # Enable Workload Identity for secure service account access
+  workloadIdentityConfig:
+    workloadPool: ${GOOGLE_CLOUD_PROJECT}.svc.id.goog
+  
+  # Logging and monitoring
+  loggingService: logging.googleapis.com/kubernetes
+  monitoringService: monitoring.googleapis.com/kubernetes
+  
+  # Enable kubectl-ai features
+  binaryAuthorization:
+    enabled: false
+  
+  # Resource usage export for AI optimization
+  resourceUsageExportConfig:
+    enableNetworkEgressMetering: true
+    consumptionMeteringConfig:
+      enabled: true
+  
+  # IP allocation for services
+  ipAllocationPolicy:
+    useIpAliases: true
+    clusterSecondaryRangeName: gke-ai-boutique-pods
+    servicesSecondaryRangeName: gke-ai-boutique-services
+  
+  # Enable private nodes for security
+  privateClusterConfig:
+    enablePrivateNodes: true
+    enablePrivateEndpoint: false
+    masterIpv4CidrBlock: 172.16.0.0/28
+  
+  # Master authorized networks (adjust as needed)
+  masterAuthorizedNetworksConfig:
+    enabled: false
+  
+  # Maintenance window
+  maintenancePolicy:
+    window:
+      dailyMaintenanceWindow:
+        startTime: "03:00"
+  
+  # Enable shielded nodes for security
+  shieldedNodes:
+    enabled: true

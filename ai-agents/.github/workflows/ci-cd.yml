@@ -1,0 +1,265 @@
+name: AI-Powered Boutique Agents CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'ai-agents/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'ai-agents/**'
+  workflow_dispatch:
+
+env:
+  GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+  GOOGLE_CLOUD_REGION: us-central1
+  CLUSTER_NAME: ai-boutique-cluster
+  REGISTRY: gcr.io
+
+jobs:
+  # Lint and Test
+  test:
+    name: Test and Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: ai-agents/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ai-agents
+      run: npm ci
+    
+    - name: Run linting
+      working-directory: ai-agents
+      run: npm run lint
+    
+    - name: Run type checking
+      working-directory: ai-agents
+      run: npm run build
+    
+    - name: Run tests
+      working-directory: ai-agents
+      run: npm run test:coverage
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        directory: ai-agents/coverage
+        flags: ai-agents
+        name: ai-agents-coverage
+
+  # Security scanning
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: 'ai-agents'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Build and push container images
+  build:
+    name: Build Images
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: github.event_name == 'push'
+    
+    strategy:
+      matrix:
+        component:
+          - personal-stylist-agent
+          - inventory-optimizer-agent
+          - customer-insights-agent
+          - boutique-api-mcp
+          - analytics-mcp
+          - ml-models-mcp
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Google Cloud CLI
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        project_id: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+    
+    - name: Configure Docker for GCR
+      run: gcloud auth configure-docker
+    
+    - name: Build and push Docker image
+      working-directory: ai-agents
+      run: |
+        IMAGE_TAG="${REGISTRY}/${GOOGLE_CLOUD_PROJECT}/${{ matrix.component }}:${GITHUB_SHA}"
+        
+        # Build the image
+        docker build -t $IMAGE_TAG \
+          --build-arg COMPONENT=${{ matrix.component }} \
+          --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+          --build-arg VCS_REF=${GITHUB_SHA} \
+          -f docker/Dockerfile.${{ matrix.component }} .
+        
+        # Push the image
+        docker push $IMAGE_TAG
+        
+        # Tag as latest for main branch
+        if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+          LATEST_TAG="${REGISTRY}/${GOOGLE_CLOUD_PROJECT}/${{ matrix.component }}:latest"
+          docker tag $IMAGE_TAG $LATEST_TAG
+          docker push $LATEST_TAG
+        fi
+
+  # Deploy to development environment
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/develop'
+    environment: development
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Google Cloud CLI
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        project_id: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+    
+    - name: Get GKE credentials
+      run: |
+        gcloud container clusters get-credentials $CLUSTER_NAME \
+          --region $GOOGLE_CLOUD_REGION \
+          --project $GOOGLE_CLOUD_PROJECT
+    
+    - name: Deploy to development namespace
+      working-directory: ai-agents
+      run: |
+        # Create development namespace if it doesn't exist
+        kubectl create namespace ai-agents-dev --dry-run=client -o yaml | kubectl apply -f -
+        
+        # Update image tags in manifests
+        export IMAGE_TAG=${GITHUB_SHA}
+        envsubst < infrastructure/manifests/agents-dev.yaml | kubectl apply -f -
+        
+        # Wait for rollout to complete
+        kubectl rollout status deployment -n ai-agents-dev --timeout=300s
+    
+    - name: Run integration tests
+      working-directory: ai-agents
+      run: |
+        # Wait for services to be ready
+        kubectl wait --for=condition=ready pod -l app=personal-stylist-agent -n ai-agents-dev --timeout=300s
+        
+        # Run integration tests against development environment
+        npm run test:integration -- --environment=development
+
+  # Deploy to production environment
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Google Cloud CLI
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        project_id: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+    
+    - name: Get GKE credentials
+      run: |
+        gcloud container clusters get-credentials $CLUSTER_NAME \
+          --region $GOOGLE_CLOUD_REGION \
+          --project $GOOGLE_CLOUD_PROJECT
+    
+    - name: Deploy to production namespace
+      working-directory: ai-agents
+      run: |
+        # Create production namespace if it doesn't exist
+        kubectl create namespace ai-agents --dry-run=client -o yaml | kubectl apply -f -
+        
+        # Update image tags in manifests
+        export IMAGE_TAG=${GITHUB_SHA}
+        envsubst < infrastructure/manifests/agents-prod.yaml | kubectl apply -f -
+        
+        # Wait for rollout to complete
+        kubectl rollout status deployment -n ai-agents --timeout=600s
+    
+    - name: Run smoke tests
+      working-directory: ai-agents
+      run: |
+        # Wait for services to be ready
+        kubectl wait --for=condition=ready pod -l app=personal-stylist-agent -n ai-agents --timeout=300s
+        
+        # Run smoke tests against production environment
+        npm run test:smoke -- --environment=production
+    
+    - name: Notify deployment success
+      if: success()
+      run: |
+        echo "🚀 Successfully deployed AI-Powered Boutique Agents to production!"
+        echo "Deployment SHA: ${GITHUB_SHA}"
+        echo "Deployed components: personal-stylist-agent, inventory-optimizer-agent, customer-insights-agent"
+
+  # Cleanup old images
+  cleanup:
+    name: Cleanup Old Images
+    runs-on: ubuntu-latest
+    needs: [deploy-prod]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Setup Google Cloud CLI
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        project_id: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+    
+    - name: Cleanup old container images
+      run: |
+        # Keep only the latest 10 images for each component
+        COMPONENTS=(
+          "personal-stylist-agent"
+          "inventory-optimizer-agent" 
+          "customer-insights-agent"
+          "boutique-api-mcp"
+          "analytics-mcp"
+          "ml-models-mcp"
+        )
+        
+        for component in "${COMPONENTS[@]}"; do
+          echo "Cleaning up old images for $component..."
+          gcloud container images list-tags ${REGISTRY}/${GOOGLE_CLOUD_PROJECT}/$component \
+            --limit=999999 --sort-by=TIMESTAMP \
+            --format='get(digest)' | tail -n +11 | \
+            xargs -I {} gcloud container images delete ${REGISTRY}/${GOOGLE_CLOUD_PROJECT}/$component@{} --quiet || true
+        done

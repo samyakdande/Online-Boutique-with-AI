@@ -1,0 +1,160 @@
+# Docker Compose for AI-Powered Boutique Agents
+version: '3.8'
+
+services:
+  # Development server with hot reload
+  dev-server:
+    build:
+      context: .
+      target: development
+    ports:
+      - "8000:8000"
+      - "8080:8080"
+      - "8081:8081" 
+      - "8082:8082"
+      - "9090:9090"
+    volumes:
+      - .:/app
+      - /app/.venv  # Exclude venv from volume mount
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - DEV_HOT_RELOAD_ENABLED=true
+    env_file:
+      - .env
+    command: python -m ai_agents.dev.server
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Boutique API MCP Server
+  boutique-api-mcp:
+    build:
+      context: .
+      target: boutique-api-mcp
+    ports:
+      - "8080:8080"
+    environment:
+      - MCP_SERVER_TYPE=boutique-api
+      - ENVIRONMENT=development
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Analytics MCP Server
+  analytics-mcp:
+    build:
+      context: .
+      target: analytics-mcp
+    ports:
+      - "8081:8081"
+    environment:
+      - MCP_SERVER_TYPE=analytics
+      - ENVIRONMENT=development
+    env_file:
+      - .env
+    depends_on:
+      - boutique-api-mcp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8081/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ML Models MCP Server
+  ml-models-mcp:
+    build:
+      context: .
+      target: ml-models-mcp
+    ports:
+      - "8082:8082"
+    environment:
+      - MCP_SERVER_TYPE=ml-models
+      - ENVIRONMENT=development
+    env_file:
+      - .env
+    depends_on:
+      - boutique-api-mcp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8082/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Individual agents for testing
+  personal-stylist:
+    build:
+      context: .
+      target: personal-stylist-agent
+    ports:
+      - "8001:8000"
+    environment:
+      - AGENT_TYPE=personal-stylist
+      - ENVIRONMENT=development
+    env_file:
+      - .env
+    depends_on:
+      - boutique-api-mcp
+      - ml-models-mcp
+
+  inventory-optimizer:
+    build:
+      context: .
+      target: inventory-optimizer-agent
+    ports:
+      - "8002:8000"
+    environment:
+      - AGENT_TYPE=inventory-optimizer
+      - ENVIRONMENT=development
+    env_file:
+      - .env
+    depends_on:
+      - boutique-api-mcp
+      - analytics-mcp
+      - ml-models-mcp
+
+  customer-insights:
+    build:
+      context: .
+      target: customer-insights-agent
+    ports:
+      - "8003:8000"
+    environment:
+      - AGENT_TYPE=customer-insights
+      - ENVIRONMENT=development
+    env_file:
+      - .env
+    depends_on:
+      - boutique-api-mcp
+      - analytics-mcp
+
+  # Test runner service
+  test-runner:
+    build:
+      context: .
+      target: development
+    volumes:
+      - .:/app
+    environment:
+      - ENVIRONMENT=test
+    env_file:
+      - .env
+    command: python -m pytest tests/ -v
+    depends_on:
+      - boutique-api-mcp
+    profiles:
+      - testing
+
+networks:
+  default:
+    name: ai-agents-network

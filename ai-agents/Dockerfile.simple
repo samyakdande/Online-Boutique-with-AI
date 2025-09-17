@@ -1,0 +1,61 @@
+# Simple Dockerfile for testing MCP servers without heavy dependencies
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+# Install minimal system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Set work directory
+WORKDIR /app
+
+# Install all required Python dependencies
+RUN pip install --no-cache-dir \
+    fastapi==0.104.1 \
+    uvicorn[standard]==0.24.0 \
+    pydantic==2.5.0 \
+    pydantic-settings==2.1.0 \
+    python-dotenv==1.0.0 \
+    rich==13.7.0 \
+    typer==0.9.0 \
+    httpx==0.25.2 \
+    websockets==12.0 \
+    PyJWT==2.8.0 \
+    google-generativeai==0.3.2
+
+# Copy source code
+COPY ai_agents/ ./ai_agents/
+COPY scripts/ ./scripts/
+
+# Copy .env if it exists, otherwise create a default one
+COPY .env* ./
+RUN if [ ! -f .env ]; then \
+    echo "ENVIRONMENT=development" > .env && \
+    echo "LOG_LEVEL=DEBUG" >> .env && \
+    echo "GEMINI_API_KEY=your-api-key-here" >> .env && \
+    echo "GEMINI_PROJECT_ID=your-project-id" >> .env && \
+    echo "GOOGLE_CLOUD_PROJECT=your-project-id" >> .env && \
+    echo "MCP_BOUTIQUE_API_PORT=8080" >> .env; \
+    fi
+
+# Change ownership to app user
+RUN chown -R appuser:appuser /app
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Expose port
+EXPOSE 8080
+
+# Default command
+CMD ["python", "-m", "ai_agents.mcp_servers.boutique_api"]

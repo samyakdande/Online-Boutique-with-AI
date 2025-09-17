@@ -1,0 +1,3 @@
+@echo off
+echo 🛠️  Starting development server with hot reload...
+docker-compose up dev-server

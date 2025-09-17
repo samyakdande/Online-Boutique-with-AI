@@ -1,0 +1,167 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubectl-ai-config
+  namespace: kube-system
+  labels:
+    app: kubectl-ai
+    component: config
+data:
+  config.yaml: |
+    # kubectl-ai configuration for AI-Powered Online Boutique
+    ai:
+      provider: "gemini"
+      model: "gemini-pro"
+      apiKey: "${GEMINI_API_KEY}"
+      projectId: "${GOOGLE_CLOUD_PROJECT}"
+      
+    # Agent-specific configurations
+    agents:
+      enabled: true
+      namespace: "ai-agents"
+      
+      # Agent discovery and communication
+      discovery:
+        enabled: true
+        protocol: "a2a"
+        port: 9090
+      
+      # Resource management
+      resources:
+        defaultCpu: "100m"
+        defaultMemory: "128Mi"
+        maxCpu: "2"
+        maxMemory: "4Gi"
+      
+      # Hot reload configuration
+      hotReload:
+        enabled: true
+        watchPaths:
+          - "/app/agents"
+          - "/app/mcp-servers"
+        excludePatterns:
+          - "*.test.ts"
+          - "node_modules"
+          - "dist"
+    
+    # MCP server configurations
+    mcp:
+      enabled: true
+      servers:
+        boutique-api:
+          port: 8080
+          healthCheck: "/health"
+        analytics:
+          port: 8081
+          healthCheck: "/health"
+        ml-models:
+          port: 8082
+          healthCheck: "/health"
+    
+    # Kubernetes integration
+    kubernetes:
+      # Intelligent resource suggestions
+      resourceOptimization: true
+      
+      # Auto-scaling based on AI workload patterns
+      intelligentAutoscaling: true
+      
+      # Predictive scaling
+      predictiveScaling:
+        enabled: true
+        lookAheadMinutes: 15
+        
+      # Workload analysis
+      workloadAnalysis:
+        enabled: true
+        metricsCollection: true
+        
+    # Monitoring and observability
+    observability:
+      metrics:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      
+      logging:
+        level: "info"
+        format: "json"
+        
+      tracing:
+        enabled: true
+        jaegerEndpoint: "http://jaeger-collector:14268/api/traces"
+    
+    # Security configuration
+    security:
+      rbac:
+        enabled: true
+      
+      networkPolicies:
+        enabled: true
+        
+      podSecurityStandards:
+        enforce: "restricted"
+        
+    # Performance tuning
+    performance:
+      # Connection pooling for AI services
+      connectionPooling:
+        maxConnections: 100
+        idleTimeout: "30s"
+      
+      # Caching for AI responses
+      caching:
+        enabled: true
+        ttl: "5m"
+        maxSize: "100MB"
+      
+      # Request batching for efficiency
+      batching:
+        enabled: true
+        maxBatchSize: 10
+        batchTimeout: "100ms"
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubectl-ai
+  namespace: kube-system
+  annotations:
+    iam.gke.io/gcp-service-account: kubectl-ai@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubectl-ai
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies", "ingresses"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubectl-ai
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubectl-ai
+subjects:
+- kind: ServiceAccount
+  name: kubectl-ai
+  namespace: kube-system

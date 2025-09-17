@@ -1,0 +1,406 @@
+services:
+  # ===== AI AGENTS SERVICES =====
+  
+  # MCP Servers
+  boutique-api-mcp:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile
+      target: boutique-api-mcp
+    ports:
+      - "8080:8080"
+    environment:
+      - MCP_SERVER_TYPE=boutique-api
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - BOUTIQUE_API_URL=http://frontend:8080
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - frontend
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  analytics-mcp:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile
+      target: analytics-mcp
+    ports:
+      - "8081:8081"
+    environment:
+      - MCP_SERVER_TYPE=analytics
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    networks:
+      - ai-boutique-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8081/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ml-models-mcp:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile
+      target: ml-models-mcp
+    ports:
+      - "8082:8082"
+    environment:
+      - MCP_SERVER_TYPE=ml-models
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    networks:
+      - ai-boutique-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8082/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI Agents
+  virtual-tryon-agent:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "9001:8000"
+    environment:
+      - AGENT_TYPE=virtual-tryon
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MCP_BOUTIQUE_URL=http://boutique-api-mcp:8080
+      - MCP_ML_MODELS_URL=http://ml-models-mcp:8082
+      - A2A_PORT=9001
+    command: ["python", "-m", "ai_agents.agents.virtual_tryon"]
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - boutique-api-mcp
+      - ml-models-mcp
+
+  dynamic-pricing-agent:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "9002:8000"
+    environment:
+      - AGENT_TYPE=dynamic-pricing
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MCP_BOUTIQUE_URL=http://boutique-api-mcp:8080
+      - MCP_ANALYTICS_URL=http://analytics-mcp:8081
+      - A2A_PORT=9002
+    command: ["python", "-m", "ai_agents.agents.dynamic_pricing"]
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - boutique-api-mcp
+      - analytics-mcp
+
+  ai-chatbot-agent:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "9003:8000"
+    environment:
+      - AGENT_TYPE=ai-chatbot
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MCP_BOUTIQUE_URL=http://boutique-api-mcp:8080
+      - MCP_ML_MODELS_URL=http://ml-models-mcp:8082
+      - A2A_PORT=9003
+    command: ["python", "-m", "ai_agents.agents.ai_chatbot"]
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - boutique-api-mcp
+      - ml-models-mcp
+
+  recommendation-agent:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "9004:8000"
+    environment:
+      - AGENT_TYPE=advanced-recommendation
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MCP_BOUTIQUE_URL=http://boutique-api-mcp:8080
+      - MCP_ML_MODELS_URL=http://ml-models-mcp:8082
+      - A2A_PORT=9004
+    command: ["python", "-m", "ai_agents.agents.advanced_recommendation"]
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - boutique-api-mcp
+      - ml-models-mcp
+
+  marketing-email-agent:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "9005:8000"
+    environment:
+      - AGENT_TYPE=marketing-email
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MCP_BOUTIQUE_URL=http://boutique-api-mcp:8080
+      - A2A_PORT=9005
+    command: ["python", "-m", "ai_agents.agents.marketing_email"]
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - boutique-api-mcp
+
+  review-tracker-agent:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "9006:8000"
+    environment:
+      - AGENT_TYPE=review-tracker
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MCP_BOUTIQUE_URL=http://boutique-api-mcp:8080
+      - MCP_ANALYTICS_URL=http://analytics-mcp:8081
+      - A2A_PORT=9006
+    command: ["python", "-m", "ai_agents.agents.review_tracker"]
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - boutique-api-mcp
+      - analytics-mcp
+
+  personal-stylist-agent:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "9007:8000"
+    environment:
+      - AGENT_TYPE=personal-stylist
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MCP_BOUTIQUE_URL=http://boutique-api-mcp:8080
+      - MCP_ML_MODELS_URL=http://ml-models-mcp:8082
+      - A2A_PORT=9007
+    command: ["python", "-m", "ai_agents.agents.personal_stylist"]
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - boutique-api-mcp
+      - ml-models-mcp
+
+  # A2A Protocol Handler (WebSocket Gateway)
+  a2a-gateway:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "9090:9090"
+    environment:
+      - SERVICE_TYPE=a2a-gateway
+      - WEBSOCKET_PORT=9090
+    command: ["python", "-m", "ai_agents.a2a.gateway"]
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - virtual-tryon-agent
+      - dynamic-pricing-agent
+      - ai-chatbot-agent
+      - recommendation-agent
+
+  # ===== ONLINE BOUTIQUE SERVICES =====
+
+  # Frontend
+  frontend:
+    build:
+      context: ./microservices-demo/src/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - CURRENCY_SERVICE_ADDR=currencyservice:7000
+      - CART_SERVICE_ADDR=cartservice:7070
+      - RECOMMENDATION_SERVICE_ADDR=recommendationservice:8080
+      - SHIPPING_SERVICE_ADDR=shippingservice:50051
+      - CHECKOUT_SERVICE_ADDR=checkoutservice:5050
+      - AD_SERVICE_ADDR=adservice:9555
+      - SHOPPING_ASSISTANT_SERVICE_ADDR=shoppingassistantservice:80
+      - CYMBAL_BRANDING=true
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - productcatalogservice
+      - currencyservice
+      - cartservice
+      - recommendationservice
+      - shippingservice
+      - checkoutservice
+      - adservice
+
+  # Product Catalog Service
+  productcatalogservice:
+    build:
+      context: ./microservices-demo/src/productcatalogservice
+      dockerfile: Dockerfile
+    ports:
+      - "3550:3550"
+    environment:
+      - PORT=3550
+    networks:
+      - ai-boutique-network
+
+  # Currency Service
+  currencyservice:
+    build:
+      context: ./microservices-demo/src/currencyservice
+      dockerfile: Dockerfile
+    ports:
+      - "7000:7000"
+    environment:
+      - PORT=7000
+    networks:
+      - ai-boutique-network
+
+  # Cart Service
+  cartservice:
+    build:
+      context: ./microservices-demo/src/cartservice/src
+      dockerfile: Dockerfile
+    ports:
+      - "7070:7070"
+    environment:
+      - REDIS_ADDR=redis-cart:6379
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - redis-cart
+
+  # Redis for Cart Service
+  redis-cart:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - ai-boutique-network
+
+  # Recommendation Service
+  recommendationservice:
+    build:
+      context: ./microservices-demo/src/recommendationservice
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"
+    environment:
+      - PORT=8080
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - productcatalogservice
+
+  # Shipping Service
+  shippingservice:
+    build:
+      context: ./microservices-demo/src/shippingservice
+      dockerfile: Dockerfile
+    ports:
+      - "50051:50051"
+    environment:
+      - PORT=50051
+    networks:
+      - ai-boutique-network
+
+  # Checkout Service
+  checkoutservice:
+    build:
+      context: ./microservices-demo/src/checkoutservice
+      dockerfile: Dockerfile
+    ports:
+      - "5050:5050"
+    environment:
+      - PORT=5050
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - SHIPPING_SERVICE_ADDR=shippingservice:50051
+      - PAYMENT_SERVICE_ADDR=paymentservice:50051
+      - EMAIL_SERVICE_ADDR=emailservice:5000
+      - CURRENCY_SERVICE_ADDR=currencyservice:7000
+      - CART_SERVICE_ADDR=cartservice:7070
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - productcatalogservice
+      - shippingservice
+      - paymentservice
+      - emailservice
+      - currencyservice
+      - cartservice
+
+  # Payment Service
+  paymentservice:
+    build:
+      context: ./microservices-demo/src/paymentservice
+      dockerfile: Dockerfile
+    ports:
+      - "50052:50051"
+    environment:
+      - PORT=50051
+    networks:
+      - ai-boutique-network
+
+  # Email Service
+  emailservice:
+    build:
+      context: ./microservices-demo/src/emailservice
+      dockerfile: Dockerfile
+    ports:
+      - "5000:8080"
+    environment:
+      - PORT=8080
+    networks:
+      - ai-boutique-network
+
+  # Ad Service
+  adservice:
+    build:
+      context: ./microservices-demo/src/adservice
+      dockerfile: Dockerfile
+    ports:
+      - "9555:9555"
+    environment:
+      - PORT=9555
+    networks:
+      - ai-boutique-network
+
+  # Load Generator (Optional - for testing)
+  loadgenerator:
+    build:
+      context: ./microservices-demo/src/loadgenerator
+      dockerfile: Dockerfile
+    environment:
+      - FRONTEND_ADDR=frontend:8080
+      - USERS=10
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - frontend
+    profiles:
+      - testing
+
+networks:
+  ai-boutique-network:
+    driver: bridge
+
+volumes:
+  redis-data:

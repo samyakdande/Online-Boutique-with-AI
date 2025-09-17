@@ -1,0 +1,116 @@
+services:
+  # Just the essential services for testing the integration
+  
+  # ML Models MCP Server (simplified)
+  ml-models-mcp:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile.simple
+    ports:
+      - "8082:8082"
+    environment:
+      - MCP_ML_MODELS_PORT=8082
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-demo_key}
+    command: ["python", "-m", "ai_agents.mcp_servers.ml_models"]
+    networks:
+      - ai-boutique-network
+
+  # Virtual Try-On Agent (simplified)
+  virtual-tryon-agent:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile.simple
+    ports:
+      - "9001:8000"
+    environment:
+      - AGENT_TYPE=virtual-tryon
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-demo_key}
+      - MCP_ML_MODELS_URL=http://ml-models-mcp:8082
+    command: ["python", "-m", "ai_agents.agents.virtual_tryon"]
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - ml-models-mcp
+
+  # A2A Gateway (simplified)
+  a2a-gateway:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile.simple
+    ports:
+      - "9090:9090"
+    environment:
+      - WEBSOCKET_PORT=9090
+    command: ["python", "-m", "ai_agents.a2a.gateway"]
+    networks:
+      - ai-boutique-network
+
+  # Frontend (from microservices-demo)
+  frontend:
+    build:
+      context: ./microservices-demo/src/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - CURRENCY_SERVICE_ADDR=currencyservice:7000
+      - CART_SERVICE_ADDR=cartservice:7070
+      - RECOMMENDATION_SERVICE_ADDR=recommendationservice:8080
+      - SHIPPING_SERVICE_ADDR=shippingservice:50051
+      - CHECKOUT_SERVICE_ADDR=checkoutservice:5050
+      - AD_SERVICE_ADDR=adservice:9555
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - productcatalogservice
+      - currencyservice
+      - cartservice
+
+  # Essential Online Boutique Services
+  productcatalogservice:
+    build:
+      context: ./microservices-demo/src/productcatalogservice
+      dockerfile: Dockerfile
+    ports:
+      - "3550:3550"
+    environment:
+      - PORT=3550
+    networks:
+      - ai-boutique-network
+
+  currencyservice:
+    build:
+      context: ./microservices-demo/src/currencyservice
+      dockerfile: Dockerfile
+    ports:
+      - "7000:7000"
+    environment:
+      - PORT=7000
+    networks:
+      - ai-boutique-network
+
+  cartservice:
+    build:
+      context: ./microservices-demo/src/cartservice/src
+      dockerfile: Dockerfile
+    ports:
+      - "7070:7070"
+    environment:
+      - REDIS_ADDR=redis-cart:6379
+    networks:
+      - ai-boutique-network
+    depends_on:
+      - redis-cart
+
+  redis-cart:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - ai-boutique-network
+
+networks:
+  ai-boutique-network:
+    driver: bridge

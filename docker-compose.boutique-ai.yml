@@ -1,0 +1,145 @@
+services:
+  # Essential Online Boutique Services
+  frontend:
+    build:
+      context: ./microservices-demo/src/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8080"
+    environment:
+      - PORT=8080
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+      - CURRENCY_SERVICE_ADDR=currencyservice:7000
+      - CART_SERVICE_ADDR=cartservice:7070
+      - RECOMMENDATION_SERVICE_ADDR=recommendationservice:8080
+      - SHIPPING_SERVICE_ADDR=shippingservice:50051
+      - CHECKOUT_SERVICE_ADDR=checkoutservice:5050
+      - AD_SERVICE_ADDR=adservice:9555
+    networks:
+      - boutique-network
+    depends_on:
+      - productcatalogservice
+      - currencyservice
+      - cartservice
+      - recommendationservice
+
+  productcatalogservice:
+    build:
+      context: ./microservices-demo/src/productcatalogservice
+      dockerfile: Dockerfile
+    ports:
+      - "3550:3550"
+    environment:
+      - PORT=3550
+    networks:
+      - boutique-network
+
+  currencyservice:
+    build:
+      context: ./microservices-demo/src/currencyservice
+      dockerfile: Dockerfile
+    ports:
+      - "7000:7000"
+    environment:
+      - PORT=7000
+    networks:
+      - boutique-network
+
+  cartservice:
+    build:
+      context: ./microservices-demo/src/cartservice/src
+      dockerfile: Dockerfile
+    ports:
+      - "7070:7070"
+    environment:
+      - REDIS_ADDR=redis-cart:6379
+    networks:
+      - boutique-network
+    depends_on:
+      - redis-cart
+
+  recommendationservice:
+    build:
+      context: ./microservices-demo/src/recommendationservice
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"
+    environment:
+      - PORT=8080
+      - PRODUCT_CATALOG_SERVICE_ADDR=productcatalogservice:3550
+    networks:
+      - boutique-network
+    depends_on:
+      - productcatalogservice
+
+  redis-cart:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - boutique-network
+
+  # Mock AI Services (simplified for testing)
+  ai-mock-server:
+    image: python:3.11-slim
+    ports:
+      - "9000:9000"
+    environment:
+      - PORT=9000
+    command: |
+      sh -c "
+      pip install fastapi uvicorn &&
+      cat > /app.py << 'EOF'
+      from fastapi import FastAPI
+      from fastapi.middleware.cors import CORSMiddleware
+      import json
+      
+      app = FastAPI()
+      app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_methods=['*'], allow_headers=['*'])
+      
+      @app.get('/health')
+      def health():
+          return {'status': 'healthy', 'service': 'ai-mock-server'}
+      
+      @app.post('/ai/virtual-tryon')
+      def virtual_tryon(data: dict):
+          return {
+              'fit_score': 8.5,
+              'style_score': 9.2,
+              'color_score': 8.8,
+              'recommendations': ['Great color match', 'Consider sizing up', 'Perfect style match']
+          }
+      
+      @app.post('/ai/pricing')
+      def dynamic_pricing(data: dict):
+          return {
+              'current_price': 67.99,
+              'recommended_price': 64.99,
+              'price_change': -3.00,
+              'confidence': 0.87
+          }
+      
+      @app.post('/ai/chat')
+      def chatbot(data: dict):
+          return {
+              'response': 'Hi! I am your AI shopping assistant. How can I help you today?',
+              'session_id': 'demo_session'
+          }
+      
+      @app.get('/ai/recommendations')
+      def recommendations():
+          return {
+              'recommendations': [
+                  {'product_id': 'OLJCESPC7Z', 'name': 'Vintage Typewriter', 'confidence': 0.9},
+                  {'product_id': '66VCHSJNUP', 'name': 'Vintage Record Player', 'confidence': 0.8}
+              ]
+          }
+      EOF
+      python -m uvicorn app:app --host 0.0.0.0 --port 9000
+      "
+    networks:
+      - boutique-network
+
+networks:
+  boutique-network:
+    driver: bridge

@@ -1,0 +1,3 @@
+@echo off
+echo 📋 Showing MCP server logs...
+docker-compose -f docker-compose.simple.yml logs -f
